@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>齒輪輪系模擬器</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --line: #d7deea;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #2563eb;
+      --accent-2: #0ea5e9;
+      --good: #059669;
+      --warn: #d97706;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft JhengHei", "Noto Sans TC", Arial, sans-serif;
+      color: var(--text);
+      background: linear-gradient(180deg, #eef4ff 0%, var(--bg) 100%);
+    }
+
+    .wrap {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+    }
+
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 20px;
+    }
+
+    .section-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 16px 0 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 110px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .slider-row {
+      grid-template-columns: 1fr 120px;
+      margin-bottom: 6px;
+    }
+
+    .slider-combo {
+      margin: 2px 0 12px;
+    }
+
+    .slider-scale {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .row.three {
+      grid-template-columns: 1fr 92px 92px;
+    }
+
+    label {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      font-size: 14px;
+      background: #fff;
+    }
+
+    input[type="range"] {
+      padding: 0;
+    }
+
+    button {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #eef2ff;
+      color: #1e3a8a;
+      border: 1px solid #c7d2fe;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .mini {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: #fafcff;
+    }
+
+    .metric .label {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .metric .value {
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .metric .sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .canvas-wrap {
+      overflow: auto;
+    }
+
+    canvas {
+      width: 100%;
+      min-height: 620px;
+      display: block;
+      background: radial-gradient(circle at top, #ffffff 0%, #f7faff 100%);
+      border-radius: 18px;
+      border: 1px solid var(--line);
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+      font-size: 14px;
+    }
+
+    .table th, .table td {
+      border-bottom: 1px solid var(--line);
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .table th {
+      background: #f8fbff;
+      position: sticky;
+      top: 0;
+    }
+
+    .dir-cw { color: var(--good); font-weight: 700; }
+    .dir-ccw { color: var(--warn); font-weight: 700; }
+
+    @media (max-width: 1080px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>齒輪輪系模擬器</h1>
+    <div class="subtitle">
+      可切換單式輪系與複式輪系，調整齒數、輸入轉速、動畫速度，並即時計算齒輪比、各齒輪轉速與旋轉方向。
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>控制面板</h2>
+
+        <div class="section-title">基本設定</div>
+        <div class="row">
+          <label for="mode">輪系模式</label>
+          <select id="mode">
+            <option value="simple">單式輪系（A→B）</option>
+            <option value="compound">複式輪系（A→B｜同軸 C→D）</option>
+          </select>
+        </div>
+        <div class="row slider-row">
+          <label for="inputRpmRange">輸入齒輪 A 轉速（rpm）</label>
+          <input id="inputRpmNumber" type="number" min="-300" max="300" step="1" value="120" />
+        </div>
+        <div class="slider-combo">
+          <input id="inputRpmRange" type="range" min="-300" max="300" step="1" value="120" />
+          <div class="slider-scale">
+            <span>-300</span>
+            <span>0</span>
+            <span>300</span>
+          </div>
+        </div>
+        
+        <div class="mini">提示：正值視為順時針，負值視為逆時針；可拖曳拉桿或直接輸入數字，範圍為 -300 到 300 rpm。</div>
+
+        <div class="section-title">齒輪參數</div>
+        <div class="row">
+          <label for="teethA">A 齒輪齒數（主動輪）</label>
+          <input id="teethA" type="number" min="8" max="120" step="1" value="20" />
+        </div>
+        <div class="row">
+          <label for="teethB">B 齒輪齒數</label>
+          <input id="teethB" type="number" min="8" max="120" step="1" value="40" />
+        </div>
+        <div class="row compound-only">
+          <label for="teethC">C 齒輪齒數（與 B 同軸）</label>
+          <input id="teethC" type="number" min="8" max="120" step="1" value="16" />
+        </div>
+        <div class="row compound-only">
+          <label for="teethD">D 齒輪齒數（輸出輪）</label>
+          <input id="teethD" type="number" min="8" max="120" step="1" value="48" />
+        </div>
+
+        <div class="button-row">
+          <button id="toggleBtn">暫停動畫</button>
+          <button id="resetBtn" class="secondary">重設預設值</button>
+        </div>
+
+        <div class="section-title">計算結果</div>
+        <div class="result-grid">
+          <div class="metric">
+            <div class="label">總齒輪比</div>
+            <div class="value" id="ratioValue">1:2</div>
+            <div class="sub" id="ratioSub">輸入 1 圈，輸出 0.5 圈</div>
+          </div>
+          <div class="metric">
+            <div class="label">輸出轉速</div>
+            <div class="value" id="outputValue">60 rpm</div>
+            <div class="sub" id="outputSub">由齒數比自動計算</div>
+          </div>
+          <div class="metric">
+            <div class="label">輸入方向</div>
+            <div class="value" id="inputDir">順時針</div>
+            <div class="sub">A 齒輪</div>
+          </div>
+          <div class="metric">
+            <div class="label">輸出方向</div>
+            <div class="value" id="outputDir">逆時針</div>
+            <div class="sub" id="outputDirSub">輸出輪方向</div>
+          </div>
+        </div>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th>齒輪</th>
+              <th>齒數</th>
+              <th>轉速 (rpm)</th>
+              <th>方向</th>
+            </tr>
+          </thead>
+          <tbody id="gearTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="card canvas-wrap">
+        <h2>動態模擬</h2>
+        <canvas id="gearCanvas" width="900" height="620"></canvas>
+        <div class="legend">
+          <span><i class="dot" style="background:#2563eb"></i> A：輸入齒輪</span>
+          <span><i class="dot" style="background:#7c3aed"></i> B：中間齒輪</span>
+          <span><i class="dot" style="background:#f59e0b"></i> C：同軸齒輪</span>
+          <span><i class="dot" style="background:#059669"></i> D：輸出齒輪</span>
+        </div>
+        <p class="mini">說明：互相咬合的兩個齒輪，旋轉方向相反；同軸的 B 與 C 方向相同、角速度相同。</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const els = {
+      mode: document.getElementById('mode'),
+      inputRpmNumber: document.getElementById('inputRpmNumber'),
+      inputRpmRange: document.getElementById('inputRpmRange'),
+      animSpeed: document.getElementById('animSpeed'),
+      teethA: document.getElementById('teethA'),
+      teethB: document.getElementById('teethB'),
+      teethC: document.getElementById('teethC'),
+      teethD: document.getElementById('teethD'),
+      toggleBtn: document.getElementById('toggleBtn'),
+      resetBtn: document.getElementById('resetBtn'),
+      ratioValue: document.getElementById('ratioValue'),
+      ratioSub: document.getElementById('ratioSub'),
+      outputValue: document.getElementById('outputValue'),
+      outputSub: document.getElementById('outputSub'),
+      inputDir: document.getElementById('inputDir'),
+      outputDir: document.getElementById('outputDir'),
+      outputDirSub: document.getElementById('outputDirSub'),
+      gearTableBody: document.getElementById('gearTableBody'),
+      canvas: document.getElementById('gearCanvas')
+    };
+
+    const ctx = els.canvas.getContext('2d');
+    let running = true;
+    let lastTime = performance.now();
+    let worldAngle = 0;
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function fmt(num) {
+      return Number(num).toFixed(2).replace(/\.00$/, '');
+    }
+
+    function dirText(rpm) {
+      if (rpm > 0) return '順時針';
+      if (rpm < 0) return '逆時針';
+      return '停止';
+    }
+
+    function dirClass(rpm) {
+      return rpm >= 0 ? 'dir-cw' : 'dir-ccw';
+    }
+
+    function readState() {
+      const mode = els.mode.value;
+      const rpmA = clamp(Number(els.inputRpmNumber.value) || 0, -300, 300);
+      const teethA = clamp(Math.round(Number(els.teethA.value) || 20), 8, 120);
+      const teethB = clamp(Math.round(Number(els.teethB.value) || 40), 8, 120);
+      const teethC = clamp(Math.round(Number(els.teethC.value) || 16), 8, 120);
+      const teethD = clamp(Math.round(Number(els.teethD.value) || 48), 8, 120);
+      const animSpeed = 1;
+
+      els.inputRpmNumber.value = rpmA;
+      els.inputRpmRange.value = rpmA;
+      els.teethA.value = teethA;
+      els.teethB.value = teethB;
+      els.teethC.value = teethC;
+      els.teethD.value = teethD;
+
+      const rpmB = rpmA * teethA / teethB * -1;
+      const rpmC = rpmB;
+      const rpmD = rpmC * teethC / teethD * -1;
+
+      const totalRatioSimple = teethB / teethA;
+      const totalRatioCompound = (teethB / teethA) * (teethD / teethC);
+
+      return {
+        mode,
+        rpmA,
+        rpmB,
+        rpmC,
+        rpmD,
+        teethA,
+        teethB,
+        teethC,
+        teethD,
+        
+        totalRatioSimple,
+        totalRatioCompound
+      };
+    }
+
+    function updateUI(state) {
+      document.querySelectorAll('.compound-only').forEach(el => {
+        el.style.display = state.mode === 'compound' ? 'grid' : 'none';
+      });
+
+      const ratio = state.mode === 'simple' ? state.totalRatioSimple : state.totalRatioCompound;
+      const outputRpm = state.mode === 'simple' ? state.rpmB : state.rpmD;
+      const outputGearName = state.mode === 'simple' ? 'B' : 'D';
+
+      els.ratioValue.textContent = `1:${fmt(ratio)}`;
+      els.ratioSub.textContent = `輸入 1 圈，輸出 ${fmt(1 / ratio)} 圈`;
+      els.outputValue.textContent = `${fmt(outputRpm)} rpm`;
+      els.outputSub.textContent = `輸出齒輪 ${outputGearName}`;
+      els.inputDir.textContent = dirText(state.rpmA);
+      els.inputDir.className = `value ${dirClass(state.rpmA)}`;
+      els.outputDir.textContent = dirText(outputRpm);
+      els.outputDir.className = `value ${dirClass(outputRpm)}`;
+      els.outputDirSub.textContent = `輸出齒輪 ${outputGearName}`;
+
+      const rows = [];
+      rows.push(`<tr><td>A</td><td>${state.teethA}</td><td>${fmt(state.rpmA)}</td><td class="${dirClass(state.rpmA)}">${dirText(state.rpmA)}</td></tr>`);
+      rows.push(`<tr><td>B</td><td>${state.teethB}</td><td>${fmt(state.rpmB)}</td><td class="${dirClass(state.rpmB)}">${dirText(state.rpmB)}</td></tr>`);
+      if (state.mode === 'compound') {
+        rows.push(`<tr><td>C</td><td>${state.teethC}</td><td>${fmt(state.rpmC)}</td><td class="${dirClass(state.rpmC)}">${dirText(state.rpmC)}</td></tr>`);
+        rows.push(`<tr><td>D</td><td>${state.teethD}</td><td>${fmt(state.rpmD)}</td><td class="${dirClass(state.rpmD)}">${dirText(state.rpmD)}</td></tr>`);
+      }
+      els.gearTableBody.innerHTML = rows.join('');
+    }
+
+    function pitchRadius(teeth) {
+      return Math.max(28, teeth * 2.2);
+    }
+
+    function drawGear(x, y, radius, teeth, angle, color, label, rpm, isCompound = false, labelOffsetY = -8) {
+      const toothDepth = Math.max(6, radius * 0.12);
+      const rootR = radius - toothDepth * 0.55;
+      const outerR = radius + toothDepth * 0.45;
+      const toothStep = (Math.PI * 2) / teeth;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+
+      ctx.beginPath();
+      for (let i = 0; i < teeth; i++) {
+        const a0 = i * toothStep;
+        const a1 = a0 + toothStep * 0.25;
+        const a2 = a0 + toothStep * 0.5;
+        const a3 = a0 + toothStep * 0.75;
+        const a4 = a0 + toothStep;
+
+        const points = [
+          [rootR, a0], [outerR, a1], [outerR, a2], [rootR, a3], [rootR, a4]
+        ];
+
+        points.forEach(([r, a], idx) => {
+          const px = Math.cos(a) * r;
+          const py = Math.sin(a) * r;
+          if (i === 0 && idx === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        });
+      }
+      ctx.closePath();
+      ctx.fillStyle = color + '22';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = color;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, rootR * 0.62, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(rootR * 0.85, 0);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.restore();
+
+      ctx.save();
+      ctx.fillStyle = '#111827';
+      ctx.font = 'bold 18px Microsoft JhengHei';
+      ctx.textAlign = 'center';
+      ctx.fillText(`齒輪 ${label}`, x, y + labelOffsetY);
+      ctx.font = '14px Microsoft JhengHei';
+      ctx.fillStyle = '#4b5563';
+      ctx.fillText(`${teeth} 齒 ｜ ${fmt(rpm)} rpm`, x, y + labelOffsetY + 24);
+      if (isCompound) {
+        ctx.fillText('與 B 同軸重疊', x, y + labelOffsetY + 44);
+      }
+      ctx.restore();
+
+      drawDirectionArrow(x, y, radius + 24, rpm, color);
+    }
+
+    function drawDirectionArrow(x, y, r, rpm, color) {
+      if (rpm === 0) return;
+      const ccw = rpm < 0;
+      const start = ccw ? Math.PI * 0.15 : Math.PI * 1.15;
+      const end = ccw ? Math.PI * 1.3 : Math.PI * 0.3;
+
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, r, start, end, ccw);
+      ctx.stroke();
+
+      const ang = end;
+      const px = x + Math.cos(ang) * r;
+      const py = y + Math.sin(ang) * r;
+      const tangent = ccw ? ang - Math.PI / 2 : ang + Math.PI / 2;
+      const arrowLen = 12;
+      const spread = 0.55;
+
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(
+        px - arrowLen * Math.cos(tangent - spread),
+        py - arrowLen * Math.sin(tangent - spread)
+      );
+      ctx.lineTo(
+        px - arrowLen * Math.cos(tangent + spread),
+        py - arrowLen * Math.sin(tangent + spread)
+      );
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    
+
+    function render(state) {
+      ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
+
+      ctx.save();
+      ctx.fillStyle = '#111827';
+      ctx.font = 'bold 20px Microsoft JhengHei';
+      ctx.fillText(state.mode === 'simple' ? '單式輪系模擬' : '複式輪系模擬', 30, 36);
+      ctx.font = '14px Microsoft JhengHei';
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText(state.mode === 'simple'
+        ? 'A 與 B 相互嚙合，方向相反。'
+        : 'A→B 嚙合；B 與 C 同軸重疊；C→D 再次嚙合。', 30, 62);
+      ctx.restore();
+
+      if (state.mode === 'simple') {
+        const rA = pitchRadius(state.teethA);
+        const rB = pitchRadius(state.teethB);
+        const xA = 220;
+        const yA = 320;
+        const xB = xA + rA + rB;
+        const yB = 320;
+
+        
+        drawGear(xA, yA, rA, state.teethA, worldAngle * state.rpmA / 120, '#2563eb', 'A', state.rpmA);
+        drawGear(xB, yB, rB, state.teethB, worldAngle * state.rpmB / 120, '#7c3aed', 'B', state.rpmB);
+
+        ctx.fillStyle = '#334155';
+        ctx.font = '15px Microsoft JhengHei';
+        ctx.fillText(`齒輪比 = Zb / Za = ${state.teethB} / ${state.teethA} = ${fmt(state.totalRatioSimple)}`, 30, 565);
+        ctx.fillText(`輸出轉速 = 輸入轉速 × Za / Zb = ${fmt(state.rpmA)} × ${state.teethA}/${state.teethB} = ${fmt(state.rpmB)} rpm`, 30, 592);
+      } else {
+        const rA = pitchRadius(state.teethA);
+        const rB = pitchRadius(state.teethB);
+        const rC = pitchRadius(state.teethC);
+        const rD = pitchRadius(state.teethD);
+        const xA = 145;
+        const yA = 320;
+        const xB = xA + rA + rB;
+        const yB = 320;
+        const xC = xB;
+        const yC = yB;
+        const xD = xC + rC + rD;
+        const yD = yC;
+
+        drawGear(xA, yA, rA, state.teethA, worldAngle * state.rpmA / 120, '#2563eb', 'A', state.rpmA);
+        drawGear(xB, yB, rB, state.teethB, worldAngle * state.rpmB / 120, '#7c3aed', 'B', state.rpmB, false, -42);
+        drawGear(xC, yC, rC, state.teethC, worldAngle * state.rpmC / 120, '#f59e0b', 'C', state.rpmC, true, 54);
+        drawGear(xD, yD, rD, state.teethD, worldAngle * state.rpmD / 120, '#059669', 'D', state.rpmD);
+
+        ctx.fillStyle = '#334155';
+        ctx.font = '15px Microsoft JhengHei';
+        ctx.fillText(`第一段比 = Zb / Za = ${state.teethB} / ${state.teethA} = ${fmt(state.teethB / state.teethA)}`, 30, 540);
+        ctx.fillText(`第二段比 = Zd / Zc = ${state.teethD} / ${state.teethC} = ${fmt(state.teethD / state.teethC)}`, 30, 567);
+        ctx.fillText(`總齒輪比 = (Zb/Za) × (Zd/Zc) = ${fmt(state.totalRatioCompound)}`, 30, 594);
+      }
+    }
+
+    function tick(now) {
+      const state = readState();
+      updateUI(state);
+
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      if (running) {
+        worldAngle += dt * Math.PI * 1.8;
+      }
+      render(state);
+      requestAnimationFrame(tick);
+    }
+
+    function resetDefaults() {
+      els.mode.value = 'simple';
+      els.inputRpmNumber.value = 120;
+      els.inputRpmRange.value = 120;
+      
+      els.teethA.value = 20;
+      els.teethB.value = 40;
+      els.teethC.value = 16;
+      els.teethD.value = 48;
+    }
+
+    els.toggleBtn.addEventListener('click', () => {
+      running = !running;
+      els.toggleBtn.textContent = running ? '暫停動畫' : '播放動畫';
+    });
+
+    els.resetBtn.addEventListener('click', () => {
+      resetDefaults();
+    });
+
+    function syncRpmFromNumber() {
+      const v = clamp(Number(els.inputRpmNumber.value) || 0, -300, 300);
+      els.inputRpmNumber.value = v;
+      els.inputRpmRange.value = v;
+    }
+
+    function syncRpmFromRange() {
+      els.inputRpmNumber.value = els.inputRpmRange.value;
+    }
+
+    els.inputRpmNumber.addEventListener('input', syncRpmFromNumber);
+    els.inputRpmRange.addEventListener('input', syncRpmFromRange);
+
+    ['mode', 'inputRpmNumber', 'inputRpmRange', 'teethA', 'teethB', 'teethC', 'teethD'].forEach(key => {
+      els[key].addEventListener('input', () => updateUI(readState()));
+    });
+
+    resetDefaults();
+    updateUI(readState());
+    requestAnimationFrame(tick);
+  </script>
+</body>
+</html>
