@@ -202,12 +202,19 @@
     }
 
     .canvas-wrap {
-      overflow: auto;
+      overflow: hidden;
+    }
+
+    .canvas-box {
+      width: 100%;
+      aspect-ratio: 900 / 620;
+      min-height: 320px;
+      max-height: 70vh;
     }
 
     canvas {
       width: 100%;
-      min-height: 620px;
+      height: 100%;
       display: block;
       background: radial-gradient(circle at top, #ffffff 0%, #f7faff 100%);
       border-radius: 18px;
@@ -275,24 +282,24 @@
           </div>
         </div>
         
-        <div class="mini">提示：正值視為順時針，負值視為逆時針；可拖曳拉桿或直接輸入數字，範圍為 -300 到 300 rpm。</div>
+        <div class="mini">提示：正值視為順時針，負值視為逆時針；可拖曳拉桿或直接輸入數字，範圍為 -300 到 300 rpm。齒輪齒數可自由輸入，範圍為 1 到 999。</div>
 
         <div class="section-title">齒輪參數</div>
         <div class="row">
           <label for="teethA">A 齒輪齒數（主動輪）</label>
-          <input id="teethA" type="number" min="8" max="120" step="1" value="20" />
+          <input id="teethA" type="number" min="1" max="999" step="1" value="20" />
         </div>
         <div class="row">
           <label for="teethB">B 齒輪齒數</label>
-          <input id="teethB" type="number" min="8" max="120" step="1" value="40" />
+          <input id="teethB" type="number" min="1" max="999" step="1" value="40" />
         </div>
         <div class="row compound-only">
           <label for="teethC">C 齒輪齒數（與 B 同軸）</label>
-          <input id="teethC" type="number" min="8" max="120" step="1" value="16" />
+          <input id="teethC" type="number" min="1" max="999" step="1" value="16" />
         </div>
         <div class="row compound-only">
           <label for="teethD">D 齒輪齒數（輸出輪）</label>
-          <input id="teethD" type="number" min="8" max="120" step="1" value="48" />
+          <input id="teethD" type="number" min="1" max="999" step="1" value="48" />
         </div>
 
         <div class="button-row">
@@ -339,7 +346,7 @@
 
       <div class="card canvas-wrap">
         <h2>動態模擬</h2>
-        <canvas id="gearCanvas" width="900" height="620"></canvas>
+        <div class="canvas-box"><canvas id="gearCanvas"></canvas></div>
         <div class="legend">
           <span><i class="dot" style="background:#2563eb"></i> A：輸入齒輪</span>
           <span><i class="dot" style="background:#7c3aed"></i> B：中間齒輪</span>
@@ -356,7 +363,6 @@
       mode: document.getElementById('mode'),
       inputRpmNumber: document.getElementById('inputRpmNumber'),
       inputRpmRange: document.getElementById('inputRpmRange'),
-      animSpeed: document.getElementById('animSpeed'),
       teethA: document.getElementById('teethA'),
       teethB: document.getElementById('teethB'),
       teethC: document.getElementById('teethC'),
@@ -378,6 +384,17 @@
     let running = true;
     let lastTime = performance.now();
     let worldAngle = 0;
+    const BASE_WIDTH = 900;
+    const BASE_HEIGHT = 620;
+
+    function resizeCanvas() {
+      const box = els.canvas.parentElement;
+      const width = Math.max(320, Math.floor(box.clientWidth));
+      const height = Math.floor(width * BASE_HEIGHT / BASE_WIDTH);
+      els.canvas.width = width;
+      els.canvas.height = height;
+    }
+
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
@@ -400,10 +417,10 @@
     function readState() {
       const mode = els.mode.value;
       const rpmA = clamp(Number(els.inputRpmNumber.value) || 0, -300, 300);
-      const teethA = clamp(Math.round(Number(els.teethA.value) || 20), 8, 120);
-      const teethB = clamp(Math.round(Number(els.teethB.value) || 40), 8, 120);
-      const teethC = clamp(Math.round(Number(els.teethC.value) || 16), 8, 120);
-      const teethD = clamp(Math.round(Number(els.teethD.value) || 48), 8, 120);
+      const teethA = clamp(Math.round(Number(els.teethA.value) || 20), 1, 999);
+      const teethB = clamp(Math.round(Number(els.teethB.value) || 40), 1, 999);
+      const teethC = clamp(Math.round(Number(els.teethC.value) || 16), 1, 999);
+      const teethD = clamp(Math.round(Number(els.teethD.value) || 48), 1, 999);
       const animSpeed = 1;
 
       els.inputRpmNumber.value = rpmA;
@@ -466,7 +483,7 @@
     }
 
     function pitchRadius(teeth) {
-      return Math.max(28, teeth * 2.2);
+      return Math.max(20, 18 + Math.sqrt(teeth) * 7.2);
     }
 
     function drawGear(x, y, radius, teeth, angle, color, label, rpm, isCompound = false, labelOffsetY = -8) {
@@ -578,6 +595,12 @@
     function render(state) {
       ctx.clearRect(0, 0, els.canvas.width, els.canvas.height);
 
+      const scaleX = els.canvas.width / BASE_WIDTH;
+      const scaleY = els.canvas.height / BASE_HEIGHT;
+      const scale = Math.min(scaleX, scaleY);
+      ctx.save();
+      ctx.scale(scaleX, scaleY);
+
       ctx.save();
       ctx.fillStyle = '#111827';
       ctx.font = 'bold 20px Microsoft JhengHei';
@@ -630,6 +653,7 @@
         ctx.fillText(`第二段比 = Zd / Zc = ${state.teethD} / ${state.teethC} = ${fmt(state.teethD / state.teethC)}`, 30, 567);
         ctx.fillText(`總齒輪比 = (Zb/Za) × (Zd/Zc) = ${fmt(state.totalRatioCompound)}`, 30, 594);
       }
+      ctx.restore();
     }
 
     function tick(now) {
@@ -682,7 +706,9 @@
       els[key].addEventListener('input', () => updateUI(readState()));
     });
 
+    window.addEventListener('resize', resizeCanvas);
     resetDefaults();
+    resizeCanvas();
     updateUI(readState());
     requestAnimationFrame(tick);
   </script>
