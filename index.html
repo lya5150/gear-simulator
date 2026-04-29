@@ -1,6 +1,4 @@
-from pathlib import Path
-
-html = r'''<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
@@ -95,6 +93,10 @@ html = r'''<!DOCTYPE html>
       font-size: 11px;
       color: var(--muted);
       margin-top: 4px;
+    }
+
+    .row.three {
+      grid-template-columns: 1fr 92px 92px;
     }
 
     label {
@@ -200,23 +202,16 @@ html = r'''<!DOCTYPE html>
     }
 
     .canvas-wrap {
-      overflow: hidden;
-    }
-
-    .canvas-stage {
-      width: 100%;
-      aspect-ratio: 900 / 620;
-      min-height: 300px;
+      overflow: auto;
     }
 
     canvas {
       width: 100%;
-      height: 100%;
+      min-height: 620px;
       display: block;
       background: radial-gradient(circle at top, #ffffff 0%, #f7faff 100%);
       border-radius: 18px;
       border: 1px solid var(--line);
-      touch-action: manipulation;
     }
 
     .table {
@@ -246,43 +241,13 @@ html = r'''<!DOCTYPE html>
         grid-template-columns: 1fr;
       }
     }
-
-    @media (max-width: 640px) {
-      .wrap {
-        padding: 14px;
-      }
-
-      h1 {
-        font-size: 24px;
-      }
-
-      .card {
-        padding: 14px;
-      }
-
-      .row, .slider-row {
-        grid-template-columns: 1fr 100px;
-      }
-
-      .result-grid {
-        grid-template-columns: 1fr;
-      }
-
-      .button-row {
-        grid-template-columns: 1fr;
-      }
-
-      .table {
-        font-size: 12px;
-      }
-    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>齒輪輪系模擬器</h1>
     <div class="subtitle">
-      可切換單式輪系與複式輪系，調整齒數與輸入轉速，並即時計算齒輪比、各齒輪轉速與旋轉方向。
+      可切換單式輪系與複式輪系，調整齒數、輸入轉速、動畫速度，並即時計算齒輪比、各齒輪轉速與旋轉方向。
     </div>
 
     <div class="grid">
@@ -297,7 +262,6 @@ html = r'''<!DOCTYPE html>
             <option value="compound">複式輪系（A→B｜同軸 C→D）</option>
           </select>
         </div>
-
         <div class="row slider-row">
           <label for="inputRpmRange">輸入齒輪 A 轉速（rpm）</label>
           <input id="inputRpmNumber" type="number" min="-300" max="300" step="1" value="120" />
@@ -310,8 +274,8 @@ html = r'''<!DOCTYPE html>
             <span>300</span>
           </div>
         </div>
-
-        <div class="mini">提示：正值視為順時針，負值視為逆時針；可拖曳拉桿或直接輸入數字，範圍為 -300 到 300 rpm。齒輪齒數可自由輸入，範圍為 1 到 999。</div>
+        
+        <div class="mini">提示：正值視為順時針，負值視為逆時針；可拖曳拉桿或直接輸入數字，範圍為 -300 到 300 rpm。</div>
 
         <div class="section-title">齒輪參數</div>
         <div class="row">
@@ -375,9 +339,7 @@ html = r'''<!DOCTYPE html>
 
       <div class="card canvas-wrap">
         <h2>動態模擬</h2>
-        <div class="canvas-stage">
-          <canvas id="gearCanvas"></canvas>
-        </div>
+        <canvas id="gearCanvas" width="900" height="620"></canvas>
         <div class="legend">
           <span><i class="dot" style="background:#2563eb"></i> A：輸入齒輪</span>
           <span><i class="dot" style="background:#7c3aed"></i> B：中間齒輪</span>
@@ -444,16 +406,12 @@ html = r'''<!DOCTYPE html>
       const stage = els.canvas.parentElement;
       const dpr = window.devicePixelRatio || 1;
       const cssWidth = Math.max(320, Math.floor(stage.clientWidth));
-      const cssHeight = Math.max(220, Math.floor(stage.clientHeight));
+      const cssHeight = Math.max(220, Math.floor(stage.clientHeight || cssWidth * LOGICAL_HEIGHT / LOGICAL_WIDTH));
 
       els.canvas.style.width = cssWidth + 'px';
       els.canvas.style.height = cssHeight + 'px';
       els.canvas.width = Math.floor(cssWidth * dpr);
       els.canvas.height = Math.floor(cssHeight * dpr);
-
-      viewScale = Math.min(cssWidth / LOGICAL_WIDTH, cssHeight / LOGICAL_HEIGHT);
-      viewOffsetX = (cssWidth - LOGICAL_WIDTH * viewScale) / 2;
-      viewOffsetY = (cssHeight - LOGICAL_HEIGHT * viewScale) / 2;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.imageSmoothingEnabled = true;
@@ -469,6 +427,10 @@ html = r'''<!DOCTYPE html>
 
       els.inputRpmNumber.value = rpmA;
       els.inputRpmRange.value = rpmA;
+      els.teethA.value = teethA;
+      els.teethB.value = teethB;
+      els.teethC.value = teethC;
+      els.teethD.value = teethD;
 
       const rpmB = rpmA * teethA / teethB * -1;
       const rpmC = rpmB;
@@ -522,21 +484,92 @@ html = r'''<!DOCTYPE html>
     }
 
     function pitchRadius(teeth) {
-      return Math.max(22, 16 + Math.sqrt(teeth) * 6.2);
+      const modulePx = 2.2;
+      return (modulePx * teeth) / 2;
     }
 
-    function drawGear(logicalX, logicalY, logicalRadius, teeth, angle, color, label, rpm, isCompound = false, labelOffsetY = -8) {
-      const x = viewOffsetX + logicalX * viewScale;
-      const y = viewOffsetY + logicalY * viewScale;
-      const radius = logicalRadius * viewScale;
+    function toothGeometry() {
+      const modulePx = 2.2;
+      return {
+        addendum: modulePx,
+        dedendum: modulePx * 1.25
+      };
+    }
 
-      const toothDepth = Math.max(4, radius * 0.12);
-      const rootR = radius - toothDepth * 0.55;
-      const outerR = radius + toothDepth * 0.45;
+    function getSceneTransform(state) {
+      const topPad = 88;
+      const bottomPad = 120;
+      const sidePad = 50;
+
+      if (state.mode === 'simple') {
+        const rA = pitchRadius(state.teethA);
+        const rB = pitchRadius(state.teethB);
+        const xA = 220;
+        const yA = 320;
+        const xB = xA + rA + rB;
+        const yB = 320;
+        const minX = Math.min(xA - rA, xB - rB) - sidePad;
+        const maxX = Math.max(xA + rA, xB + rB) + sidePad;
+        const maxR = Math.max(rA, rB);
+        const minY = yA - maxR - topPad;
+        const maxY = yA + maxR + bottomPad;
+        return { scale: calcScale(minX, maxX, minY, maxY), minX, maxX, minY, maxY };
+      }
+
+      const rA = pitchRadius(state.teethA);
+      const rB = pitchRadius(state.teethB);
+      const rC = pitchRadius(state.teethC);
+      const rD = pitchRadius(state.teethD);
+      const xA = 145;
+      const yA = 320;
+      const xB = xA + rA + rB;
+      const yB = 320;
+      const xC = xB;
+      const yC = yB;
+      const xD = xC + rC + rD;
+      const yD = yC;
+      const maxR = Math.max(rA, rB, rC, rD);
+      const minX = Math.min(xA - rA, xB - rB, xC - rC, xD - rD) - sidePad;
+      const maxX = Math.max(xA + rA, xB + rB, xC + rC, xD + rD) + sidePad;
+      const minY = yA - maxR - topPad;
+      const maxY = yA + maxR + bottomPad;
+      return { scale: calcScale(minX, maxX, minY, maxY), minX, maxX, minY, maxY };
+    }
+
+    function calcScale(minX, maxX, minY, maxY) {
+      const cssWidth = els.canvas.clientWidth || LOGICAL_WIDTH;
+      const cssHeight = els.canvas.clientHeight || LOGICAL_HEIGHT;
+      const sceneW = Math.max(1, maxX - minX);
+      const sceneH = Math.max(1, maxY - minY);
+      return Math.min(cssWidth / sceneW, cssHeight / sceneH);
+    }
+
+    function setSceneTransform(state) {
+      const cssWidth = els.canvas.clientWidth || LOGICAL_WIDTH;
+      const cssHeight = els.canvas.clientHeight || LOGICAL_HEIGHT;
+      const t = getSceneTransform(state);
+      viewScale = t.scale;
+      viewOffsetX = (cssWidth - (t.maxX - t.minX) * viewScale) / 2 - t.minX * viewScale;
+      viewOffsetY = (cssHeight - (t.maxY - t.minY) * viewScale) / 2 - t.minY * viewScale;
+    }
+
+    function toScreenX(x) { return viewOffsetX + x * viewScale; }
+    function toScreenY(y) { return viewOffsetY + y * viewScale; }
+    function toScreenR(r) { return r * viewScale; }
+
+    function drawGear(x, y, radius, teeth, angle, color, label, rpm, isCompound = false, labelOffsetY = -8) {
+      const sx = toScreenX(x);
+      const sy = toScreenY(y);
+      const sr = toScreenR(radius);
+      const tooth = toothGeometry();
+      const addendum = Math.max(1.5, tooth.addendum * viewScale);
+      const dedendum = Math.max(2, tooth.dedendum * viewScale);
+      const rootR = sr - dedendum;
+      const outerR = sr + addendum;
       const toothStep = (Math.PI * 2) / teeth;
 
       ctx.save();
-      ctx.translate(x, y);
+      ctx.translate(sx, sy);
       ctx.rotate(angle);
 
       ctx.beginPath();
@@ -546,11 +579,9 @@ html = r'''<!DOCTYPE html>
         const a2 = a0 + toothStep * 0.5;
         const a3 = a0 + toothStep * 0.75;
         const a4 = a0 + toothStep;
-
         const points = [
           [rootR, a0], [outerR, a1], [outerR, a2], [rootR, a3], [rootR, a4]
         ];
-
         points.forEach(([r, a], idx) => {
           const px = Math.cos(a) * r;
           const py = Math.sin(a) * r;
@@ -561,7 +592,7 @@ html = r'''<!DOCTYPE html>
       ctx.closePath();
       ctx.fillStyle = color + '22';
       ctx.fill();
-      ctx.lineWidth = Math.max(1.5, 2 * viewScale);
+      ctx.lineWidth = Math.max(1.2, 2 * viewScale);
       ctx.strokeStyle = color;
       ctx.stroke();
 
@@ -576,24 +607,24 @@ html = r'''<!DOCTYPE html>
       ctx.moveTo(0, 0);
       ctx.lineTo(rootR * 0.85, 0);
       ctx.strokeStyle = color;
-      ctx.lineWidth = Math.max(2, 3 * viewScale);
+      ctx.lineWidth = Math.max(1.8, 3 * viewScale);
       ctx.stroke();
       ctx.restore();
 
       ctx.save();
       ctx.fillStyle = '#111827';
       ctx.textAlign = 'center';
-      ctx.font = `bold ${Math.max(12, 18 * viewScale)}px Microsoft JhengHei`;
-      ctx.fillText(`齒輪 ${label}`, x, y + labelOffsetY * viewScale);
-      ctx.font = `${Math.max(10, 14 * viewScale)}px Microsoft JhengHei`;
+      ctx.font = `${Math.max(10, 18 * viewScale)}px Microsoft JhengHei`;
+      ctx.fillText(`齒輪 ${label}`, sx, sy + labelOffsetY * viewScale);
+      ctx.font = `${Math.max(9, 14 * viewScale)}px Microsoft JhengHei`;
       ctx.fillStyle = '#4b5563';
-      ctx.fillText(`${teeth} 齒 ｜ ${fmt(rpm)} rpm`, x, y + (labelOffsetY + 24) * viewScale);
+      ctx.fillText(`${teeth} 齒 ｜ ${fmt(rpm)} rpm`, sx, sy + (labelOffsetY + 24) * viewScale);
       if (isCompound) {
-        ctx.fillText('與 B 同軸重疊', x, y + (labelOffsetY + 44) * viewScale);
+        ctx.fillText('與 B 同軸重疊', sx, sy + (labelOffsetY + 44) * viewScale);
       }
       ctx.restore();
 
-      drawDirectionArrow(x, y, radius + 24 * viewScale, rpm, color);
+      drawDirectionArrow(sx, sy, sr + 24 * viewScale, rpm, color);
     }
 
     function drawDirectionArrow(x, y, r, rpm, color) {
@@ -604,7 +635,7 @@ html = r'''<!DOCTYPE html>
 
       ctx.save();
       ctx.strokeStyle = color;
-      ctx.lineWidth = Math.max(2, 3 * viewScale);
+      ctx.lineWidth = Math.max(1.5, 3 * viewScale);
       ctx.beginPath();
       ctx.arc(x, y, r, start, end, ccw);
       ctx.stroke();
@@ -618,50 +649,46 @@ html = r'''<!DOCTYPE html>
 
       ctx.beginPath();
       ctx.moveTo(px, py);
-      ctx.lineTo(
-        px - arrowLen * Math.cos(tangent - spread),
-        py - arrowLen * Math.sin(tangent - spread)
-      );
-      ctx.lineTo(
-        px - arrowLen * Math.cos(tangent + spread),
-        py - arrowLen * Math.sin(tangent + spread)
-      );
+      ctx.lineTo(px - arrowLen * Math.cos(tangent - spread), py - arrowLen * Math.sin(tangent - spread));
+      ctx.lineTo(px - arrowLen * Math.cos(tangent + spread), py - arrowLen * Math.sin(tangent + spread));
       ctx.closePath();
       ctx.fillStyle = color;
       ctx.fill();
       ctx.restore();
     }
 
-    function drawSceneHeader(state) {
+    function drawHeader(state) {
       ctx.save();
       ctx.fillStyle = '#111827';
-      ctx.font = `bold ${Math.max(14, 20 * viewScale)}px Microsoft JhengHei`;
-      ctx.fillText(state.mode === 'simple' ? '單式輪系模擬' : '複式輪系模擬', viewOffsetX + 30 * viewScale, viewOffsetY + 36 * viewScale);
+      ctx.font = `${Math.max(12, 20 * viewScale)}px Microsoft JhengHei`;
+      ctx.fillText(state.mode === 'simple' ? '單式輪系模擬' : '複式輪系模擬', toScreenX(30), toScreenY(36));
       ctx.font = `${Math.max(10, 14 * viewScale)}px Microsoft JhengHei`;
       ctx.fillStyle = '#6b7280';
-      const note = state.mode === 'simple'
-        ? 'A 與 B 相互嚙合，方向相反。'
-        : 'A→B 嚙合；B 與 C 同軸重疊；C→D 再次嚙合。';
-      ctx.fillText(note, viewOffsetX + 30 * viewScale, viewOffsetY + 62 * viewScale);
+      ctx.fillText(
+        state.mode === 'simple' ? 'A 與 B 相互嚙合，方向相反。' : 'A→B 嚙合；B 與 C 同軸重疊；C→D 再次嚙合。',
+        toScreenX(30),
+        toScreenY(62)
+      );
       ctx.restore();
     }
 
-    function drawFooterText(lines) {
+    function drawFooter(lines) {
       ctx.save();
       ctx.fillStyle = '#334155';
       ctx.font = `${Math.max(10, 15 * viewScale)}px Microsoft JhengHei`;
       lines.forEach((line, index) => {
-        ctx.fillText(line, viewOffsetX + 30 * viewScale, viewOffsetY + (540 + index * 27) * viewScale);
+        ctx.fillText(line, toScreenX(30), toScreenY(540 + index * 27));
       });
       ctx.restore();
     }
 
     function render(state) {
+      setSceneTransform(state);
       const cssWidth = els.canvas.clientWidth || LOGICAL_WIDTH;
       const cssHeight = els.canvas.clientHeight || LOGICAL_HEIGHT;
       ctx.clearRect(0, 0, cssWidth, cssHeight);
 
-      drawSceneHeader(state);
+      drawHeader(state);
 
       if (state.mode === 'simple') {
         const rA = pitchRadius(state.teethA);
@@ -674,41 +701,41 @@ html = r'''<!DOCTYPE html>
         drawGear(xA, yA, rA, state.teethA, worldAngle * state.rpmA / 120, '#2563eb', 'A', state.rpmA);
         drawGear(xB, yB, rB, state.teethB, worldAngle * state.rpmB / 120, '#7c3aed', 'B', state.rpmB);
 
-        drawFooterText([
+        drawFooter([
           `齒輪比 = Zb / Za = ${state.teethB} / ${state.teethA} = ${fmt(state.totalRatioSimple)}`,
           `輸出轉速 = 輸入轉速 × Za / Zb = ${fmt(state.rpmA)} × ${state.teethA}/${state.teethB} = ${fmt(state.rpmB)} rpm`
         ]);
-      } else {
-        const rA = pitchRadius(state.teethA);
-        const rB = pitchRadius(state.teethB);
-        const rC = pitchRadius(state.teethC);
-        const rD = pitchRadius(state.teethD);
-        const xA = 145;
-        const yA = 320;
-        const xB = xA + rA + rB;
-        const yB = 320;
-        const xC = xB;
-        const yC = yB;
-        const xD = xC + rC + rD;
-        const yD = yC;
-
-        drawGear(xA, yA, rA, state.teethA, worldAngle * state.rpmA / 120, '#2563eb', 'A', state.rpmA);
-        drawGear(xB, yB, rB, state.teethB, worldAngle * state.rpmB / 120, '#7c3aed', 'B', state.rpmB, false, -42);
-        drawGear(xC, yC, rC, state.teethC, worldAngle * state.rpmC / 120, '#f59e0b', 'C', state.rpmC, true, 54);
-        drawGear(xD, yD, rD, state.teethD, worldAngle * state.rpmD / 120, '#059669', 'D', state.rpmD);
-
-        drawFooterText([
-          `第一段比 = Zb / Za = ${state.teethB} / ${state.teethA} = ${fmt(state.teethB / state.teethA)}`,
-          `第二段比 = Zd / Zc = ${state.teethD} / ${state.teethC} = ${fmt(state.teethD / state.teethC)}`,
-          `總齒輪比 = (Zb/Za) × (Zd/Zc) = ${fmt(state.totalRatioCompound)}`
-        ]);
+        return;
       }
+
+      const rA = pitchRadius(state.teethA);
+      const rB = pitchRadius(state.teethB);
+      const rC = pitchRadius(state.teethC);
+      const rD = pitchRadius(state.teethD);
+      const xA = 145;
+      const yA = 320;
+      const xB = xA + rA + rB;
+      const yB = 320;
+      const xC = xB;
+      const yC = yB;
+      const xD = xC + rC + rD;
+      const yD = yC;
+
+      drawGear(xA, yA, rA, state.teethA, worldAngle * state.rpmA / 120, '#2563eb', 'A', state.rpmA);
+      drawGear(xB, yB, rB, state.teethB, worldAngle * state.rpmB / 120, '#7c3aed', 'B', state.rpmB, false, -42);
+      drawGear(xC, yC, rC, state.teethC, worldAngle * state.rpmC / 120, '#f59e0b', 'C', state.rpmC, true, 54);
+      drawGear(xD, yD, rD, state.teethD, worldAngle * state.rpmD / 120, '#059669', 'D', state.rpmD);
+
+      drawFooter([
+        `第一段比 = Zb / Za = ${state.teethB} / ${state.teethA} = ${fmt(state.teethB / state.teethA)}`,
+        `第二段比 = Zd / Zc = ${state.teethD} / ${state.teethC} = ${fmt(state.teethD / state.teethC)}`,
+        `總齒輪比 = (Zb/Za) × (Zd/Zc) = ${fmt(state.totalRatioCompound)}`
+      ]);
     }
 
     function tick(now) {
       const state = readState();
       updateUI(state);
-
       const dt = (now - lastTime) / 1000;
       lastTime = now;
       if (running) {
@@ -748,17 +775,13 @@ html = r'''<!DOCTYPE html>
       els.inputRpmNumber.value = els.inputRpmRange.value;
     }
 
-    els.inputRpmNumber.addEventListener('input', syncRpmFromNumber);
-    els.inputRpmRange.addEventListener('input', syncRpmFromRange);
-
     function applySingleTeethLimit(el, fallback) {
       const raw = el.value.trim();
       if (raw === '' || raw === '-') {
         el.value = fallback;
         return;
       }
-      const v = clamp(Math.round(Number(raw) || fallback), 1, 999);
-      el.value = v;
+      el.value = clamp(Math.round(Number(raw) || fallback), 1, 999);
     }
 
     function applyTeethLimits() {
@@ -769,13 +792,17 @@ html = r'''<!DOCTYPE html>
       updateUI(readState());
     }
 
+    els.inputRpmNumber.addEventListener('input', syncRpmFromNumber);
+    els.inputRpmRange.addEventListener('input', syncRpmFromRange);
+
     ['mode', 'inputRpmNumber', 'inputRpmRange'].forEach(key => {
       els[key].addEventListener('input', () => updateUI(readState()));
     });
 
     ['teethA', 'teethB', 'teethC', 'teethD'].forEach(key => {
-      els[key].addEventListener('change', applyTeethLimits);
+      els[key].addEventListener('input', applyTeethLimits);
       els[key].addEventListener('blur', applyTeethLimits);
+      els[key].addEventListener('change', applyTeethLimits);
     });
 
     window.addEventListener('resize', resizeCanvas);
@@ -787,8 +814,3 @@ html = r'''<!DOCTYPE html>
   </script>
 </body>
 </html>
-'''
-
-path = Path("/mnt/data/index_mobile_no_distortion.html")
-path.write_text(html, encoding="utf-8")
-print(f"已建立：{path}")
